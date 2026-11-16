@@ -12,15 +12,15 @@ struct VertOut {
 
 @vertex
 fn vert(
-    @location(0) pos: vec4f,
+    @location(0) pos: vec3f,
 ) -> VertOut {
     var out: VertOut;
 
-    let frustum_pos: vec4f = uniforms.view_proj_mat * pos;
+    let frustum_pos: vec4f = uniforms.view_proj_mat * vec4f(pos, 1);
 
     out.pos_builtin = frustum_pos;
 
-    out.pos = pos;
+    out.pos = vec4f(pos, 1);
     out.uv = frustum_pos.xy / frustum_pos.w;
 
     return out;

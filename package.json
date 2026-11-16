@@ -28,6 +28,8 @@
 		"vite": "^8.3.0"
 	},
 	"dependencies": {
+		"@loaders.gl/core": "^4.5.4",
+		"@loaders.gl/gltf": "^4.5.4",
 		"@vaie/hui": "^0.3.0",
 		"wgpu-matrix": "^3.4.2"
 	}

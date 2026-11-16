@@ -3,7 +3,7 @@ import { onMount } from "svelte";
 import { Draggable } from "@vaie/hui";
 import { GpuRunner } from "./GpuRunner.svelte";
 import { CameraOrbit } from "./CameraOrbit.svelte";
-    import { Camera } from "./Camera.svelte";
+import { Camera } from "./Camera.svelte";
 
 let canvas: HTMLCanvasElement;
 let runner = $state<GpuRunner | null>();
@@ -98,10 +98,14 @@ main {
 
     display: grid;
     place-items: center;
+
+    background: oklch(0.96 0.01 190);
 }
 
 canvas {
     width: 50rem;
     height: 50rem;
+
+    background: oklch(1 0 0);
 }
 </style>
