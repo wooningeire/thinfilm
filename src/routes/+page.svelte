@@ -29,8 +29,13 @@ onMount(async () => {
     if (runnerResult === null) return;
 
     runner = runnerResult;
-    runner.draw();
 });
+
+$effect(() => {
+    runner?.draw({
+        camera,
+    });
+})
 
 
 const onResize = () => {

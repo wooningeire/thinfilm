@@ -1,8 +1,13 @@
-@group(0) @binding(0) var<storage, read> verts: array<vec4f>;
+struct Uniforms {
+    view_proj_mat: mat4x4f,
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
 struct VertOut {
     @builtin(position) pos_builtin: vec4f,
     @location(0) pos: vec4f,
+    @location(1) uv: vec2f,
 }
 
 @vertex
@@ -11,8 +16,12 @@ fn vert(
 ) -> VertOut {
     var out: VertOut;
 
-    out.pos_builtin = pos;
+    let frustum_pos: vec4f = uniforms.view_proj_mat * pos;
+
+    out.pos_builtin = frustum_pos;
+
     out.pos = pos;
+    out.uv = frustum_pos.xy / frustum_pos.w;
 
     return out;
 }

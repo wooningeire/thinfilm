@@ -1,3 +1,4 @@
+import type { Camera } from "./Camera.svelte";
 import shaderCode from "./shader.wgsl?raw";
 
 export class GpuRunner {
@@ -6,6 +7,7 @@ export class GpuRunner {
 
     private readonly bindGroup: GPUBindGroup;
     private readonly verts: GPUBuffer;
+    private readonly uniforms: GPUBuffer;
     private readonly renderPipeline: GPURenderPipeline;
 
     private constructor({
@@ -14,6 +16,7 @@ export class GpuRunner {
 
         bindGroup,
         verts,
+        uniforms,
         renderPipeline,
     }: {
         device: GPUDevice,
@@ -21,6 +24,7 @@ export class GpuRunner {
 
         bindGroup: GPUBindGroup,
         verts: GPUBuffer,
+        uniforms: GPUBuffer,
         renderPipeline: GPURenderPipeline,
     }) {
         this.device = device;
@@ -28,6 +32,7 @@ export class GpuRunner {
 
         this.bindGroup = bindGroup;
         this.verts = verts;
+        this.uniforms = uniforms;
         this.renderPipeline = renderPipeline;
     }
 
@@ -59,7 +64,7 @@ export class GpuRunner {
                     binding: 0,
                     visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
                     buffer: {
-                        type: "read-only-storage",
+                        type: "uniform",
                     },
                 },
             ],
@@ -68,7 +73,7 @@ export class GpuRunner {
         const verts = device.createBuffer({
             label: "verts buffer",
             size: 48,
-            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
         });
         device.queue.writeBuffer(verts, 0, new Float32Array([
             -0.75, -0.75, 0.5, 1,
@@ -76,13 +81,19 @@ export class GpuRunner {
             0.75, -0.75, 0.5, 1,
         ]));
 
+        const uniforms = device.createBuffer({
+            label: "uniforms buffer",
+            size: 64,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
         const bindGroup = device.createBindGroup({
             label: "bind group",
             layout: bindGroupLayout,
             entries: [
                 {
                     binding: 0,
-                    resource: verts,
+                    resource: uniforms,
                 },
             ],
         });
@@ -145,11 +156,16 @@ export class GpuRunner {
 
             bindGroup,
             verts,
+            uniforms,
             renderPipeline,
         });
     }
 
-    draw() {
+    draw({
+        camera,
+    }: {
+        camera: Camera,
+    }) {
         const commandEncoder = this.device.createCommandEncoder({
             label: "command encoder",
         });
@@ -157,6 +173,8 @@ export class GpuRunner {
         const view = this.context.getCurrentTexture().createView({
             label: "view",
         });
+
+        this.device.queue.writeBuffer(this.uniforms, 0, camera.viewProjMat);
 
         const renderPassEncoder = commandEncoder.beginRenderPass({
             label: "render pass",
