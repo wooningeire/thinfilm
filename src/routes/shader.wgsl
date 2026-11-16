@@ -1,6 +1,6 @@
 struct Uniforms {
     view_proj_mat: mat4x4f,
-    view_mat: mat4x4f,
+    view_inv_mat: mat4x4f,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -34,10 +34,13 @@ fn vert(
 fn frag(
     in: VertOut,
 ) -> @location(0) vec4f {
-    let ray_dir = normalize(in.position - uniforms.view_mat[3].xyz);
-    let reflection_amt = abs(dot(ray_dir, in.normal));
+    let ray_dir = normalize(in.position - uniforms.view_inv_mat[3].xyz);
 
-    let thin_film_depth = 1e-15 + fbmNoise(in.position, 3) * 1e-16;
+    let normal_preturbation = 0.2 * fbmNoise(in.position * 20 + 100, 4);
+    let normal = normalize(in.normal + normal_preturbation);
+    let reflection_amt = abs(dot(ray_dir, normal));
+
+    let thin_film_depth = 1e-6 + fbmNoise(in.position, 3) * 5e-8;
     const THIN_FILM_IOR: f32 = 1.5;
     // let phase_diff = 2 * THIN_FILM_DEPTH * THIN_FILM_IOR * reflection_amt;
 
@@ -48,45 +51,58 @@ fn frag(
     const GREEN_WAVELENGTH: f32 = 550e-9;
     const BLUE_WAVELENGTH: f32 = 465e-9;
 
-
-    const SPEED_OF_LIGHT: f32 = 299792458;
-    const RED_FREQ: f32 = SPEED_OF_LIGHT / RED_WAVELENGTH;
-    const GREEN_FREQ: f32 = SPEED_OF_LIGHT / GREEN_WAVELENGTH;
-    const BLUE_FREQ: f32 = SPEED_OF_LIGHT / BLUE_WAVELENGTH;
-
     const TWO_PI: f32 = 6.28318531;
-    const RED_ANGULAR_VELOCITY: f32 = RED_FREQ * TWO_PI;
-    const GREEN_ANGULAR_VELOCITY: f32 = GREEN_FREQ * TWO_PI;
-    const BLUE_ANGULAR_VELOCITY: f32 = BLUE_FREQ * TWO_PI;
+    const RED_ANGULAR_VELOCITY: f32 = TWO_PI / RED_WAVELENGTH;
+    const GREEN_ANGULAR_VELOCITY: f32 = TWO_PI / GREEN_WAVELENGTH;
+    const BLUE_ANGULAR_VELOCITY: f32 = TWO_PI / BLUE_WAVELENGTH;
 
 
-    const LIGHT_POS = vec3f(1, 1, 1);
-    let pos_to_light = LIGHT_POS - in.position;
-    let dir_to_light = normalize(pos_to_light);
-    let cos_to_light = dot(dir_to_light, in.normal);
-    let diffuse = cos_to_light / dot(pos_to_light, pos_to_light);
-    // return vec4f(vec3f(diffuse), 1);
+    const LIGHTS = array(
+        Light(vec3f(1, 1, 1), vec3f(20, 15, 10)),
+        Light(vec3f(0.5, -0.5, 0.5), vec3f(50, 500, 50)),
+        Light(vec3f(-2, 0, -2), vec3f(100, 20, 200)),
+    );
 
-    let reflection_normal = normalize(normalize(pos_to_light) - ray_dir);
-    let reflection_cos_to_light = abs(dot(dir_to_light, reflection_normal));
+    var light_power = vec3f(0.3, 0.4, 0.5);
+    for (var i = 0u; i < 3; i++) {
+        let pos_to_light = LIGHTS[i].position - in.position;
+        let dir_to_light = normalize(pos_to_light + normal_preturbation);
+        let cos_to_light = max(0, dot(dir_to_light, normal));
+        let diffuse = cos_to_light / dot(pos_to_light, pos_to_light);
+        // return vec4f(vec3f(diffuse), 1);
+
+        let reflection_normal = normalize(normalize(pos_to_light) - ray_dir);
+        let reflection_cos_to_light = abs(dot(dir_to_light, reflection_normal));
 
 
-    let internal_cos = cos(asin(sin(acos(reflection_cos_to_light) / THIN_FILM_IOR)));
-    let phase_diff = 2 * thin_film_depth * THIN_FILM_IOR * internal_cos;
+        let internal_cos = sqrt(1 - (1 - reflection_cos_to_light * reflection_cos_to_light) / (THIN_FILM_IOR * THIN_FILM_IOR));
+        let phase_diff = 2 * thin_film_depth * THIN_FILM_IOR * internal_cos;
 
-    const INTERFERENCE_AMPLITUDE_TERM: f32 = REFLECTED_AMT * REFLECTED_AMT + REFRACTED_AMT * REFRACTED_AMT;
-    const INTERFERENCE_AMPLITUDE_COEFF: f32 = 2 * REFLECTED_AMT * REFRACTED_AMT;
-    let light_power = vec3f(
-        sqrt(INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * cos(RED_ANGULAR_VELOCITY * phase_diff)),
-        sqrt(INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * cos(GREEN_ANGULAR_VELOCITY * phase_diff)),
-        sqrt(INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * cos(BLUE_ANGULAR_VELOCITY * phase_diff)),
-    ) * diffuse * vec3f(20, 15, 10);
+        const INTERFERENCE_AMPLITUDE_TERM: f32 = REFLECTED_AMT * REFLECTED_AMT + REFRACTED_AMT * REFRACTED_AMT;
+        const INTERFERENCE_AMPLITUDE_COEFF: f32 = 2 * REFLECTED_AMT * REFRACTED_AMT;
+        light_power += vec3f(
+            INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * -cos(RED_ANGULAR_VELOCITY * phase_diff),
+            INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * -cos(GREEN_ANGULAR_VELOCITY * phase_diff),
+            INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * -cos(BLUE_ANGULAR_VELOCITY * phase_diff),
+        ) * diffuse * LIGHTS[i].color;
+    }
+
+    let light_tonemapped = light_power / (1 + light_power);
 
     const SRGB_INV_GAMMA: f32 = 1 / 2.2;
-    let light_color = pow(light_power, vec3f(SRGB_INV_GAMMA));
+    let light_color = pow(light_tonemapped, vec3f(SRGB_INV_GAMMA));
 
-    let light_tonemapped = light_color / (1 + light_color);
-    return vec4f(light_tonemapped, 1);
+    return vec4f(light_color, 1);
+}
+
+struct Light {
+    position: vec3f,
+    color: vec3f,
+}
+
+struct Wavelength {
+    angular_velocity: vec3f,
+    color: vec3f,
 }
 
 fn hash31(p: vec3f) -> f32 {
