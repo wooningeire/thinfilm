@@ -34,7 +34,44 @@ fn vert(
 fn frag(
     in: VertOut,
 ) -> @location(0) vec4f {
-    let normal = uniforms.view_mat * vec4f(in.normal, 0);
+    let reflection_amt = abs(dot(normalize(in.position - uniforms.view_mat[3].xyz), in.normal));
 
-    return vec4f(vec3f(normal.z), 1);
+    const THIN_FILM_DEPTH: f32 = 1e-15;
+    const THIN_FILM_IOR: f32 = 1.5;
+    let phase_diff = 2 * THIN_FILM_DEPTH * THIN_FILM_IOR * reflection_amt;
+
+    const REFLECTED_AMT: f32 = 0.5;
+    const REFRACTED_AMT: f32 = 1 - REFLECTED_AMT;
+
+    const RED_WAVELENGTH: f32 = 610e-9;
+    const GREEN_WAVELENGTH: f32 = 550e-9;
+    const BLUE_WAVELENGTH: f32 = 465e-9;
+
+
+    const SPEED_OF_LIGHT: f32 = 299792458;
+    const RED_FREQ: f32 = SPEED_OF_LIGHT / RED_WAVELENGTH;
+    const GREEN_FREQ: f32 = SPEED_OF_LIGHT / GREEN_WAVELENGTH;
+    const BLUE_FREQ: f32 = SPEED_OF_LIGHT / BLUE_WAVELENGTH;
+
+    const TWO_PI: f32 = 6.28318531;
+    const RED_ANGULAR_VELOCITY: f32 = RED_FREQ * TWO_PI;
+    const GREEN_ANGULAR_VELOCITY: f32 = GREEN_FREQ * TWO_PI;
+    const BLUE_ANGULAR_VELOCITY: f32 = BLUE_FREQ * TWO_PI;
+
+
+
+
+    const INTERFERENCE_AMPLITUDE_TERM: f32 = REFLECTED_AMT * REFLECTED_AMT + REFRACTED_AMT * REFRACTED_AMT;
+    const INTERFERENCE_AMPLITUDE_COEFF: f32 = 2 * REFLECTED_AMT * REFRACTED_AMT;
+    let light_power = vec3f(
+        sqrt(INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * cos(RED_ANGULAR_VELOCITY * phase_diff)),
+        sqrt(INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * cos(GREEN_ANGULAR_VELOCITY * phase_diff)),
+        sqrt(INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * cos(BLUE_ANGULAR_VELOCITY * phase_diff)),
+    );
+
+    const SRGB_INV_GAMMA: f32 = 1 / 2.2;
+    let light_color = pow(light_power, vec3f(SRGB_INV_GAMMA));
+
+    // let light_tonemapped = light_color / (1 + light_color);
+    return vec4f(light_color * vec3f(0.4, 0.5, 0.2) + vec3f(0.6, 0.5, 0.8), 1);
 }

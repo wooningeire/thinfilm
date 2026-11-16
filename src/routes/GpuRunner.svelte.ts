@@ -229,7 +229,7 @@ export class GpuRunner {
         });
 
         this.device.queue.writeBuffer(this.uniforms, 0, camera.viewProjMat);
-        this.device.queue.writeBuffer(this.uniforms, 64, camera.viewMat);
+        this.device.queue.writeBuffer(this.uniforms, 64, camera.viewInvMat);
 
         const renderPassEncoder = commandEncoder.beginRenderPass({
             label: "render pass",
