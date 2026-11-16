@@ -12,7 +12,7 @@ export class CameraOrbit implements CameraControlScheme {
     lat = $state(PI / 6);
     long = $state(7 * PI / 8);
     
-    offset = $state(vec3.fromValues(1, 0, 1.5));
+    offset = $state(vec3.fromValues(0, 0, 0));
 
     readonly orientation = $derived(mat4.mul(
         mat4.rotationZ(-this.long),
