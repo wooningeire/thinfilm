@@ -44,8 +44,12 @@ fn frag(
     const THIN_FILM_IOR: f32 = 1.5;
     // let phase_diff = 2 * THIN_FILM_DEPTH * THIN_FILM_IOR * reflection_amt;
 
-    const REFLECTED_AMT: f32 = 0.5;
-    const REFRACTED_AMT: f32 = 1 - REFLECTED_AMT;
+
+    let reflectance = fresnel_schlick(normal, ray_dir, 1, THIN_FILM_IOR);
+    let transmittance = 1 - reflectance;
+    let interference_amplitude_term = reflectance * reflectance + transmittance * transmittance;
+    let interference_amplitude_coeff = 2 * reflectance * transmittance;
+
 
     const RED_WAVELENGTH: f32 = 610e-9;
     const GREEN_WAVELENGTH: f32 = 550e-9;
@@ -58,9 +62,9 @@ fn frag(
 
 
     const LIGHTS = array(
-        Light(vec3f(1, 1, 1), vec3f(20, 15, 10)),
-        Light(vec3f(0.5, -0.5, 0.5), vec3f(50, 500, 50)),
-        Light(vec3f(-2, 0, -2), vec3f(100, 20, 200)),
+        Light(vec3f(1, 1, 1), vec3f(0.125, 0.125, 0.5)),
+        Light(vec3f(0.5, -0.5, 0.5), vec3f(0.125, 0.5, 0.125)),
+        Light(vec3f(-2, 0, -2), vec3f(0.125, 0.05, 0.25)),
     );
 
     var light_power = vec3f(0.3, 0.4, 0.5);
@@ -77,13 +81,11 @@ fn frag(
 
         let internal_cos = sqrt(1 - (1 - reflection_cos_to_light * reflection_cos_to_light) / (THIN_FILM_IOR * THIN_FILM_IOR));
         let phase_diff = 2 * thin_film_depth * THIN_FILM_IOR * internal_cos;
-
-        const INTERFERENCE_AMPLITUDE_TERM: f32 = REFLECTED_AMT * REFLECTED_AMT + REFRACTED_AMT * REFRACTED_AMT;
-        const INTERFERENCE_AMPLITUDE_COEFF: f32 = 2 * REFLECTED_AMT * REFRACTED_AMT;
         light_power += vec3f(
-            INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * -cos(RED_ANGULAR_VELOCITY * phase_diff),
-            INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * -cos(GREEN_ANGULAR_VELOCITY * phase_diff),
-            INTERFERENCE_AMPLITUDE_TERM + INTERFERENCE_AMPLITUDE_COEFF * -cos(BLUE_ANGULAR_VELOCITY * phase_diff),
+            // energy = amplitude^2
+            interference_amplitude_term + interference_amplitude_coeff * -cos(RED_ANGULAR_VELOCITY * phase_diff),
+            interference_amplitude_term + interference_amplitude_coeff * -cos(GREEN_ANGULAR_VELOCITY * phase_diff),
+            interference_amplitude_term + interference_amplitude_coeff * -cos(BLUE_ANGULAR_VELOCITY * phase_diff),
         ) * diffuse * LIGHTS[i].color;
     }
 
@@ -103,6 +105,16 @@ struct Light {
 struct Wavelength {
     angular_velocity: vec3f,
     color: vec3f,
+}
+
+fn fresnel_schlick(normal: vec3f, dir: vec3f, ior_1: f32, ior_2: f32) -> f32 {
+    let sqrt_r0 = (ior_1 - ior_2) / (ior_1 + ior_2);
+    let r0 = sqrt_r0 * sqrt_r0;
+
+    let one_cos = 1 - dot(normal, dir);
+    let one_cos_2 = one_cos * one_cos;
+
+    return r0 + (1 - r0) * one_cos_2 * one_cos_2 * one_cos;
 }
 
 fn hash31(p: vec3f) -> f32 {

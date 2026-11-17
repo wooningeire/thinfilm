@@ -92,13 +92,14 @@ export class GpuRunner {
         for (let i = 0; i < primitive.indices!.value.length; i++) {
             const index = primitive.indices!.value[i];
 
+            // glb contents are y up
             posBuffer[i * 3] = primitive.attributes.POSITION.value[index * 3];
-            posBuffer[i * 3 + 1] = primitive.attributes.POSITION.value[index * 3 + 1];
-            posBuffer[i * 3 + 2] = primitive.attributes.POSITION.value[index * 3 + 2];
+            posBuffer[i * 3 + 1] = primitive.attributes.POSITION.value[index * 3 + 2];
+            posBuffer[i * 3 + 2] = primitive.attributes.POSITION.value[index * 3 + 1];
 
             norBuffer[i * 3] = primitive.attributes.NORMAL.value[index * 3];
-            norBuffer[i * 3 + 1] = primitive.attributes.NORMAL.value[index * 3 + 1];
-            norBuffer[i * 3 + 2] = primitive.attributes.NORMAL.value[index * 3 + 2];
+            norBuffer[i * 3 + 1] = primitive.attributes.NORMAL.value[index * 3 + 2];
+            norBuffer[i * 3 + 2] = primitive.attributes.NORMAL.value[index * 3 + 1];
         }
 
         const verts = device.createBuffer({
