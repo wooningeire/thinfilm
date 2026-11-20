@@ -47,8 +47,12 @@ fn frag(
 
     let reflectance = fresnel_schlick(normal, ray_dir, 1, THIN_FILM_IOR);
     let transmittance = 1 - reflectance;
-    let interference_amplitude_term = reflectance * reflectance + transmittance * transmittance;
-    let interference_amplitude_coeff = 2 * reflectance * transmittance;
+
+    let reflectance_col = reflectance * vec3f(0.6, 0.2, 1);
+    let transmittance_col = transmittance * vec3f(1, 0.2, 0.5);
+
+    let interference_amplitude_term = reflectance_col * reflectance_col + transmittance_col * transmittance_col;
+    let interference_amplitude_coeff = 2 * reflectance_col * transmittance_col;
 
 
     const RED_WAVELENGTH: f32 = 610e-9;
@@ -62,12 +66,12 @@ fn frag(
 
 
     const LIGHTS = array(
-        Light(vec3f(1, 1, 1), vec3f(0.125, 0.125, 0.5)),
-        Light(vec3f(0.5, -0.5, 0.5), vec3f(0.125, 0.5, 0.125)),
-        Light(vec3f(-2, 0, -2), vec3f(0.125, 0.05, 0.25)),
+        Light(vec3f(1, 1, 1), vec3f(0.05, 0.05, 0.25)),
+        Light(vec3f(0.5, -0.5, 0.5), vec3f(0.05, 0.25, 0.05)),
+        Light(vec3f(-2, 0, -2), vec3f(0.05, 0.02, 0.125)),
     );
 
-    var light_power = vec3f(0.3, 0.4, 0.5);
+    var light_power = vec3f(0.15, 0.2, 0.25);
     for (var i = 0u; i < 3; i++) {
         let pos_to_light = LIGHTS[i].position - in.position;
         let dir_to_light = normalize(pos_to_light + normal_preturbation);
@@ -81,13 +85,15 @@ fn frag(
 
         let internal_cos = sqrt(1 - (1 - reflection_cos_to_light * reflection_cos_to_light) / (THIN_FILM_IOR * THIN_FILM_IOR));
         let phase_diff = 2 * thin_film_depth * THIN_FILM_IOR * internal_cos;
-        light_power += vec3f(
-            // energy = amplitude^2
-            interference_amplitude_term + interference_amplitude_coeff * -cos(RED_ANGULAR_VELOCITY * phase_diff),
-            interference_amplitude_term + interference_amplitude_coeff * -cos(GREEN_ANGULAR_VELOCITY * phase_diff),
-            interference_amplitude_term + interference_amplitude_coeff * -cos(BLUE_ANGULAR_VELOCITY * phase_diff),
-        ) * diffuse * LIGHTS[i].color;
+        // energy = amplitude^2
+        light_power += (interference_amplitude_term + interference_amplitude_coeff * vec3f(
+            -cos(RED_ANGULAR_VELOCITY * phase_diff),
+            -cos(GREEN_ANGULAR_VELOCITY * phase_diff),
+            -cos(BLUE_ANGULAR_VELOCITY * phase_diff),
+        )) * diffuse * LIGHTS[i].color;
     }
+
+    // light_power *= vec3f(0.6, 0.2, 1);
 
     let light_tonemapped = light_power / (1 + light_power);
 
